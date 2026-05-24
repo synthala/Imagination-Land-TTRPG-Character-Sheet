@@ -77,9 +77,11 @@ let themeRequestId = 0;
 const startupMenu = document.querySelector("#startup-menu");
 const startupLoadCharacterButton = document.querySelector("#startup-load-character");
 const startupCreateCharacterButton = document.querySelector("#startup-create-character");
+const startupMenuTitleText = document.querySelector("#startup-menu-title-text");
 const appShell = document.querySelector(".app-shell");
 const rootStyle = document.documentElement.style;
 const nameInput = document.querySelector("#character-name");
+const sheetTitleText = document.querySelector("#sheet-title-text");
 const adversityTokensInput = document.querySelector("#adversity-tokens");
 const statsList = document.querySelector("#stats-list");
 const strengthsList = document.querySelector("#strengths-list");
@@ -114,6 +116,7 @@ initialize();
 
 function initialize() {
   nameInput.value = state.name;
+  updateCharacterSheetTitle();
   adversityTokensInput.value = String(state.adversityTokens);
   notesBackstoryInput.value = state.notesBackstory;
   inventoryNotesInput.value = state.inventory;
@@ -141,6 +144,7 @@ function bindStaticEvents() {
 
   nameInput.addEventListener("input", () => {
     state.name = nameInput.value.trimStart();
+    updateCharacterSheetTitle();
     persistState("Name updated.");
     renderSummary();
   });
@@ -774,6 +778,7 @@ function setActiveSheetTab(tab) {
 function applyState(nextState, statusText) {
   state = nextState;
   nameInput.value = state.name;
+  updateCharacterSheetTitle();
   adversityTokensInput.value = String(state.adversityTokens);
   notesBackstoryInput.value = state.notesBackstory;
   inventoryNotesInput.value = state.inventory;
@@ -792,6 +797,17 @@ function showCharacterArtPreview() {
 function hideCharacterArtPreview() {
   appShell.classList.remove("is-previewing-character");
   document.body.classList.remove("is-previewing-character");
+}
+
+function updateCharacterSheetTitle() {
+  const trimmedName = state.name.trim();
+  const nextTitle = trimmedName
+    ? `"${trimmedName}" Character Sheet`
+    : "Character Sheet";
+
+  document.title = nextTitle;
+  startupMenuTitleText.textContent = nextTitle;
+  sheetTitleText.textContent = nextTitle;
 }
 
 /**
@@ -970,6 +986,11 @@ function getOrCreateStatRow(statName) {
 
   modifierInput.addEventListener("input", () => {
     state.stats[statName].modifier = clampInteger(modifierInput.value);
+    refreshStatModifierEdit(statName, `${statName} updated.`);
+  });
+
+  modifierInput.addEventListener("change", () => {
+    state.stats[statName].modifier = clampInteger(modifierInput.value);
     refreshSheetState(`${statName} updated.`);
   });
 
@@ -1078,6 +1099,25 @@ function animateStatReorder(previousRects) {
  */
 function refreshSheetState(statusText) {
   renderStats();
+  renderSummary();
+  persistState(statusText);
+}
+
+/**
+ * @param {string} statName
+ * @param {string} statusText
+ */
+function refreshStatModifierEdit(statName, statusText) {
+  const statRow = statRowElements.get(statName);
+
+  if (statRow) {
+    const statFormulaElement = statRow.querySelector(".stat-formula");
+
+    if (statFormulaElement) {
+      statFormulaElement.textContent = formatStatExpression(state.stats[statName]);
+    }
+  }
+
   renderSummary();
   persistState(statusText);
 }
