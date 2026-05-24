@@ -15,6 +15,7 @@
 
   <div id="startup-menu" class="startup-menu" role="dialog" aria-modal="true" aria-label="Start character menu" tabindex="-1">
     <div class="startup-menu-card">
+      <button id="startup-exit-menu" class="startup-menu-exit" type="button" aria-label="Exit start menu">X</button>
       <p id="startup-menu-title-text" class="startup-menu-eyebrow">Character Sheet</p>
       <div class="startup-menu-actions">
         <button id="startup-load-character" class="primary-button startup-menu-button" type="button">Load Character</button>
@@ -165,7 +166,10 @@
     <article class="stat-row">
       <div class="stat-row-copy">
         <div class="stat-heading">
-          <h3 class="stat-name"></h3>
+          <label class="stat-name-field">
+            <span class="sr-only">Attribute Name</span>
+            <input class="stat-name" type="text" autocomplete="off">
+          </label>
           <p class="stat-rank"></p>
         </div>
         <p class="stat-formula"></p>

@@ -15,6 +15,7 @@
  *   name: string,
  *   adversityTokens: number,
  *   stats: Record<string, StatLine>,
+ *   attributeNames: Record<string, string>,
  *   characterImage: string,
  *   notesBackstory: string,
  *   inventory: string,
@@ -67,16 +68,22 @@ const DEFAULT_STATE = {
     Brain: { baseDie: "d4", bonusDie: "None", modifier: 0 },
     Brawn: { baseDie: "d4", bonusDie: "None", modifier: 0 }
   },
+  attributeNames: STAT_NAMES.reduce((result, statName) => {
+    result[statName] = statName;
+    return result;
+  }, {}),
   strengths: []
 };
 
 /** @type {CharacterState} */
 let state = loadState();
 let themeRequestId = 0;
+const collapsedSnapshotStrengthIds = new Set();
 
 const startupMenu = document.querySelector("#startup-menu");
 const startupLoadCharacterButton = document.querySelector("#startup-load-character");
 const startupCreateCharacterButton = document.querySelector("#startup-create-character");
+const startupExitMenuButton = document.querySelector("#startup-exit-menu");
 const startupMenuTitleText = document.querySelector("#startup-menu-title-text");
 const appShell = document.querySelector(".app-shell");
 const rootStyle = document.documentElement.style;
@@ -139,6 +146,12 @@ function bindStaticEvents() {
     setStartupMenuVisible(false);
     closeSheetMenu();
     applyState(createDefaultState(), "New character started.");
+    nameInput.focus();
+  });
+
+  startupExitMenuButton.addEventListener("click", () => {
+    setStartupMenuVisible(false);
+    closeSheetMenu();
     nameInput.focus();
   });
 
@@ -825,8 +838,8 @@ function renderStats() {
   const rankedStats = getRankedStats();
 
   for (const [index, statEntry] of rankedStats.entries()) {
-    const statRow = getOrCreateStatRow(statEntry.name);
-    syncStatRow(statRow, statEntry.name, index + 1);
+    const statRow = getOrCreateStatRow(statEntry.statName);
+    syncStatRow(statRow, statEntry.statName, index + 1);
     statsList.append(statRow);
   }
 
@@ -863,10 +876,12 @@ function renderStrengths() {
     descriptionField.addEventListener("input", () => {
       strength.description = descriptionField.value.trimStart();
       persistState("Strength updated.");
+      renderSummary();
     });
 
     removeButton.addEventListener("click", () => {
       state.strengths = state.strengths.filter((entry) => entry.id !== strength.id);
+      collapsedSnapshotStrengthIds.delete(strength.id);
       renderStrengths();
       persistState("Strength removed.");
       renderSummary();
@@ -898,14 +913,7 @@ function renderSummary() {
   );
   summaryStack.append(rankingCard);
 
-  const strengthsCard = createSummaryListCard(
-    "Current Strengths",
-    namedStrengths.map((strength) => ({
-      label: strength.name,
-      value: strength.description.trim()
-    })),
-    "No named strengths."
-  );
+  const strengthsCard = createStrengthsSummaryCard(namedStrengths);
   summaryStack.append(strengthsCard);
 }
 
@@ -959,6 +967,58 @@ function createSummaryListCard(title, items, emptyMessage = "") {
 }
 
 /**
+ * @param {Strength[]} strengths
+ * @returns {HTMLElement}
+ */
+function createStrengthsSummaryCard(strengths) {
+  const card = document.createElement("article");
+  card.className = "summary-card summary-card-list strengths-summary-card";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Current Strengths";
+  card.append(heading);
+
+  if (strengths.length === 0) {
+    const emptyText = document.createElement("p");
+    emptyText.className = "summary-expression";
+    emptyText.textContent = "No named strengths.";
+    card.append(emptyText);
+    return card;
+  }
+
+  const list = document.createElement("div");
+  list.className = "summary-list strengths-summary-list";
+
+  for (const strength of strengths) {
+    const strengthDetail = document.createElement("details");
+    strengthDetail.className = "summary-list-row strength-summary-row";
+    strengthDetail.open = !collapsedSnapshotStrengthIds.has(strength.id);
+    strengthDetail.addEventListener("toggle", () => {
+      if (strengthDetail.open) {
+        collapsedSnapshotStrengthIds.delete(strength.id);
+        return;
+      }
+
+      collapsedSnapshotStrengthIds.add(strength.id);
+    });
+
+    const summary = document.createElement("summary");
+    summary.className = "summary-list-label strength-summary-label";
+    summary.textContent = strength.name;
+
+    const description = document.createElement("p");
+    description.className = "summary-list-value strength-summary-description";
+    description.textContent = strength.description.trim() || "No description yet.";
+
+    strengthDetail.append(summary, description);
+    list.append(strengthDetail);
+  }
+
+  card.append(list);
+  return card;
+}
+
+/**
  * @param {string} statName
  * @returns {HTMLElement}
  */
@@ -974,24 +1034,31 @@ function getOrCreateStatRow(statName) {
   const baseDropdown = fragment.querySelector(".stat-base-die");
   const bonusDropdown = fragment.querySelector(".stat-bonus-die");
   const modifierInput = fragment.querySelector(".stat-modifier");
+  const statNameInput = fragment.querySelector(".stat-name");
 
   initializeGlassDropdown(baseDropdown, DIE_OPTIONS, state.stats[statName].baseDie, (value) => {
     state.stats[statName].baseDie = value;
-    refreshSheetState(`${statName} updated.`);
+    refreshSheetState(`${getStatDisplayName(statName)} updated.`);
   });
   initializeGlassDropdown(bonusDropdown, BONUS_OPTIONS, state.stats[statName].bonusDie, (value) => {
     state.stats[statName].bonusDie = value;
-    refreshSheetState(`${statName} updated.`);
+    refreshSheetState(`${getStatDisplayName(statName)} updated.`);
+  });
+
+  statNameInput.addEventListener("input", () => {
+    state.attributeNames[statName] = statNameInput.value.trimStart();
+    renderSummary();
+    persistState("Attribute renamed.");
   });
 
   modifierInput.addEventListener("input", () => {
     state.stats[statName].modifier = clampInteger(modifierInput.value);
-    refreshStatModifierEdit(statName, `${statName} updated.`);
+    refreshStatModifierEdit(statName, `${getStatDisplayName(statName)} updated.`);
   });
 
   modifierInput.addEventListener("change", () => {
     state.stats[statName].modifier = clampInteger(modifierInput.value);
-    refreshSheetState(`${statName} updated.`);
+    refreshSheetState(`${getStatDisplayName(statName)} updated.`);
   });
 
   statRow.dataset.statName = statName;
@@ -1006,7 +1073,7 @@ function getOrCreateStatRow(statName) {
  */
 function syncStatRow(statRow, statName, rank) {
   const statLine = state.stats[statName];
-  const statNameElement = statRow.querySelector(".stat-name");
+  const statNameInput = statRow.querySelector(".stat-name");
   const statRankElement = statRow.querySelector(".stat-rank");
   const statFormulaElement = statRow.querySelector(".stat-formula");
   const baseDropdown = statRow.querySelector(".stat-base-die");
@@ -1014,7 +1081,9 @@ function syncStatRow(statRow, statName, rank) {
   const modifierInput = statRow.querySelector(".stat-modifier");
 
   statRow.dataset.rank = String(rank);
-  statNameElement.textContent = statName;
+  if (statNameInput.value !== getStatEditableName(statName)) {
+    statNameInput.value = getStatEditableName(statName);
+  }
   statRankElement.textContent = rank === 1 ? "Top Edge" : `Rank ${rank}`;
   statFormulaElement.textContent = formatStatExpression(statLine);
 
@@ -1027,12 +1096,13 @@ function syncStatRow(statRow, statName, rank) {
 }
 
 /**
- * @returns {{ name: string, line: StatLine, score: number }[]}
+ * @returns {{ statName: string, name: string, line: StatLine, score: number }[]}
  */
 function getRankedStats() {
   return STAT_NAMES
     .map((statName, index) => ({
-      name: statName,
+      statName,
+      name: getStatDisplayName(statName),
       line: state.stats[statName],
       score: scoreStatLine(state.stats[statName]),
       originalIndex: index
@@ -1211,6 +1281,22 @@ function closeAllGlassDropdowns() {
 }
 
 /**
+ * @param {string} statName
+ * @returns {string}
+ */
+function getStatEditableName(statName) {
+  return state.attributeNames[statName] ?? statName;
+}
+
+/**
+ * @param {string} statName
+ * @returns {string}
+ */
+function getStatDisplayName(statName) {
+  return getStatEditableName(statName).trim() || statName;
+}
+
+/**
  * @param {StatLine} statLine
  * @returns {string}
  */
@@ -1280,6 +1366,10 @@ function createDefaultState() {
       };
       return result;
     }, {}),
+    attributeNames: STAT_NAMES.reduce((result, statName) => {
+      result[statName] = DEFAULT_STATE.attributeNames[statName];
+      return result;
+    }, {}),
     strengths: DEFAULT_STATE.strengths.map((strength) => ({
       id: crypto.randomUUID(),
       name: strength.name,
@@ -1299,6 +1389,10 @@ function serializeCharacterState() {
     characterImage: state.characterImage,
     notesBackstory: state.notesBackstory,
     inventory: state.inventory,
+    attributeNames: STAT_NAMES.reduce((result, statName) => {
+      result[statName] = state.attributeNames[statName] ?? statName;
+      return result;
+    }, {}),
     stats: STAT_NAMES.reduce((result, statName) => {
       result[statName] = {
         baseDie: state.stats[statName].baseDie,
@@ -1329,6 +1423,16 @@ function normalizeCharacterState(parsedState) {
   fallbackState.characterImage = typeof parsedState.characterImage === "string" ? parsedState.characterImage : fallbackState.characterImage;
   fallbackState.notesBackstory = typeof parsedState.notesBackstory === "string" ? parsedState.notesBackstory : fallbackState.notesBackstory;
   fallbackState.inventory = typeof parsedState.inventory === "string" ? parsedState.inventory : fallbackState.inventory;
+
+  if (parsedState.attributeNames && typeof parsedState.attributeNames === "object") {
+    for (const statName of STAT_NAMES) {
+      const parsedAttributeName = parsedState.attributeNames[statName];
+
+      if (typeof parsedAttributeName === "string") {
+        fallbackState.attributeNames[statName] = parsedAttributeName;
+      }
+    }
+  }
 
   for (const statName of STAT_NAMES) {
     const parsedStat = parsedState.stats && parsedState.stats[statName];
