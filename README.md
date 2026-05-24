@@ -1,4 +1,4 @@
-# Frohlich Character Sheet
+# Imagination Land Character Sheet
 
 This project is a browser-based character sheet.
 
