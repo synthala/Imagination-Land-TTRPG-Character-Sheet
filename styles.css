@@ -223,6 +223,79 @@ body.is-previewing-character .character-background-blur {
   letter-spacing: 0.01em;
 }
 
+.startup-local-characters {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.startup-local-heading {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(14, 34, 53, 0.68);
+}
+
+.startup-local-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(320px, 36vh);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.startup-local-character-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.startup-local-character {
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.24);
+  color: #000000;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.startup-local-delete {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid rgba(96, 24, 24, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(96, 24, 24, 0.9);
+  cursor: pointer;
+}
+
+.startup-local-delete svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.startup-local-character:hover,
+.startup-local-character:focus-visible,
+.startup-local-delete:hover,
+.startup-local-delete:focus-visible {
+  background: linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  outline: none;
+}
+
 .startup-menu-actions {
   display: grid;
   gap: 18px;

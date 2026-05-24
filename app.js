@@ -23,7 +23,13 @@
  * }} CharacterState
  */
 
-const STORAGE_KEY = "frohlich-character-sheet";
+const LEGACY_STORAGE_KEY = "frohlich-character-sheet";
+const CHARACTER_RECORD_PREFIX = "frohlich-character-sheet:character:";
+const CHARACTER_INDEX_KEY = "frohlich-character-sheet:character-index";
+const ACTIVE_CHARACTER_SESSION_KEY = "frohlich-character-sheet:active-character-id";
+const CHARACTER_DATABASE_NAME = "frohlich-character-sheet-db";
+const CHARACTER_DATABASE_VERSION = 1;
+const CHARACTER_STORE_NAME = "characters";
 const DIE_OPTIONS = ["d4", "d6", "d8", "d10", "d12", "d20"];
 const BONUS_OPTIONS = ["None", ...DIE_OPTIONS];
 const STAT_NAMES = ["Flight", "Charm", "Fight", "Grit", "Brain", "Brawn"];
@@ -75,9 +81,13 @@ const DEFAULT_STATE = {
   strengths: []
 };
 
+/** @type {string} */
+let currentCharacterId = window.sessionStorage.getItem(ACTIVE_CHARACTER_SESSION_KEY) || "";
+
 /** @type {CharacterState} */
-let state = loadState();
+let state = createDefaultState();
 let themeRequestId = 0;
+let hasMigratedLocalStorageCharacters = false;
 const collapsedSnapshotStrengthIds = new Set();
 
 const startupMenu = document.querySelector("#startup-menu");
@@ -85,6 +95,7 @@ const startupLoadCharacterButton = document.querySelector("#startup-load-charact
 const startupCreateCharacterButton = document.querySelector("#startup-create-character");
 const startupExitMenuButton = document.querySelector("#startup-exit-menu");
 const startupMenuTitleText = document.querySelector("#startup-menu-title-text");
+const startupLocalCharacters = document.querySelector("#startup-local-characters");
 const appShell = document.querySelector(".app-shell");
 const rootStyle = document.documentElement.style;
 const nameInput = document.querySelector("#character-name");
@@ -121,7 +132,15 @@ const statRowElements = new Map();
 
 initialize();
 
-function initialize() {
+async function initialize() {
+  try {
+    state = await loadState();
+  } catch (error) {
+    console.warn("Unable to load local character database.", error);
+    state = createDefaultState();
+    setActiveCharacterId(createCharacterId());
+  }
+
   nameInput.value = state.name;
   updateCharacterSheetTitle();
   adversityTokensInput.value = String(state.adversityTokens);
@@ -132,6 +151,7 @@ function initialize() {
   renderStats();
   renderStrengths();
   renderSummary();
+  renderStartupLocalCharacters();
   setActiveSheetTab(sheetTabs[0]);
   bindStaticEvents();
   setStartupMenuVisible(true);
@@ -145,6 +165,7 @@ function bindStaticEvents() {
   startupCreateCharacterButton.addEventListener("click", () => {
     setStartupMenuVisible(false);
     closeSheetMenu();
+    setActiveCharacterId(createCharacterId());
     applyState(createDefaultState(), "New character started.");
     nameInput.focus();
   });
@@ -188,6 +209,7 @@ function bindStaticEvents() {
 
   newCharacterButton.addEventListener("click", () => {
     closeSheetMenu();
+    setActiveCharacterId(createCharacterId());
     applyState(createDefaultState(), "New character started.");
   });
 
@@ -232,6 +254,7 @@ function bindStaticEvents() {
     try {
       const fileContents = await readFileAsText(file);
       const parsedState = JSON.parse(fileContents);
+      setActiveCharacterId(createCharacterId());
       applyState(normalizeCharacterState(parsedState), "Character loaded.");
       setStartupMenuVisible(false);
     } catch (error) {
@@ -367,6 +390,10 @@ function downloadCharacterFile() {
  * @param {boolean} isVisible
  */
 function setStartupMenuVisible(isVisible) {
+  if (isVisible) {
+    renderStartupLocalCharacters();
+  }
+
   startupMenu.hidden = !isVisible;
   appShell.inert = isVisible;
   document.body.classList.toggle("startup-menu-open", isVisible);
@@ -383,7 +410,7 @@ function closeSheetMenu() {
 }
 
 function getIdleStatusText() {
-  return "Saved locally. Save to file to load on another device or browser.";
+  return "Autosaved locally in this tab. Export to move devices or browsers.";
 }
 
 /**
@@ -395,6 +422,110 @@ function setTransientStatus(statusText) {
   persistState.statusTimeout = window.setTimeout(() => {
     saveStatus.textContent = getIdleStatusText();
   }, 1800);
+}
+
+async function renderStartupLocalCharacters() {
+  try {
+    const characterIndex = await loadCharacterIndex();
+    startupLocalCharacters.replaceChildren();
+
+    if (characterIndex.length === 0) {
+      startupLocalCharacters.hidden = true;
+      return;
+    }
+
+    startupLocalCharacters.hidden = false;
+
+    const heading = document.createElement("p");
+    heading.className = "startup-local-heading";
+    heading.textContent = "Autosaved Characters";
+    startupLocalCharacters.append(heading);
+
+    const list = document.createElement("div");
+    list.className = "startup-local-list";
+
+    for (const characterEntry of characterIndex) {
+      const characterRow = document.createElement("div");
+      characterRow.className = "startup-local-character-row";
+
+      const characterButton = document.createElement("button");
+      characterButton.className = "startup-local-character";
+      characterButton.type = "button";
+      characterButton.textContent = characterEntry.name;
+      characterButton.addEventListener("click", () => {
+        openLocalCharacter(characterEntry.id);
+      });
+
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "startup-local-delete";
+      deleteButton.type = "button";
+      deleteButton.setAttribute("aria-label", `Delete ${characterEntry.name} autosave`);
+      deleteButton.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 6h18"></path>
+          <path d="M8 6V4h8v2"></path>
+          <path d="M6 6l1 15h10l1-15"></path>
+          <path d="M10 10v7"></path>
+          <path d="M14 10v7"></path>
+        </svg>
+      `;
+      deleteButton.addEventListener("click", () => {
+        deleteLocalCharacter(characterEntry.id);
+      });
+
+      characterRow.append(characterButton, deleteButton);
+      list.append(characterRow);
+    }
+
+    startupLocalCharacters.append(list);
+  } catch (error) {
+    console.warn("Unable to render local characters.", error);
+    startupLocalCharacters.hidden = true;
+  }
+}
+
+/**
+ * @param {string} characterId
+ */
+async function openLocalCharacter(characterId) {
+  try {
+    const savedCharacter = await loadStoredCharacter(characterId);
+
+    if (!savedCharacter) {
+      renderStartupLocalCharacters();
+      setTransientStatus("Character not found.");
+      return;
+    }
+
+    setActiveCharacterId(characterId);
+    applyState(savedCharacter, "Character opened.");
+    setStartupMenuVisible(false);
+    nameInput.focus();
+  } catch (error) {
+    console.warn("Unable to open local character.", error);
+    setTransientStatus("Open failed.");
+  }
+}
+
+/**
+ * @param {string} characterId
+ */
+async function deleteLocalCharacter(characterId) {
+  try {
+    await deleteStoredCharacter(characterId);
+
+    if (characterId === currentCharacterId) {
+      setActiveCharacterId(createCharacterId());
+      applyState(createDefaultState(), "Autosave deleted.");
+    } else {
+      setTransientStatus("Autosave deleted.");
+    }
+
+    renderStartupLocalCharacters();
+  } catch (error) {
+    console.warn("Unable to delete local character.", error);
+    setTransientStatus("Delete failed.");
+  }
 }
 
 /**
@@ -1379,29 +1510,30 @@ function createDefaultState() {
 }
 
 /**
+ * @param {CharacterState} characterState
  * @returns {Record<string, unknown>}
  */
-function serializeCharacterState() {
+function serializeCharacterState(characterState = state) {
   return {
     version: 1,
-    name: state.name,
-    adversityTokens: state.adversityTokens,
-    characterImage: state.characterImage,
-    notesBackstory: state.notesBackstory,
-    inventory: state.inventory,
+    name: characterState.name,
+    adversityTokens: characterState.adversityTokens,
+    characterImage: characterState.characterImage,
+    notesBackstory: characterState.notesBackstory,
+    inventory: characterState.inventory,
     attributeNames: STAT_NAMES.reduce((result, statName) => {
-      result[statName] = state.attributeNames[statName] ?? statName;
+      result[statName] = characterState.attributeNames[statName] ?? statName;
       return result;
     }, {}),
     stats: STAT_NAMES.reduce((result, statName) => {
       result[statName] = {
-        baseDie: state.stats[statName].baseDie,
-        bonusDie: state.stats[statName].bonusDie,
-        modifier: state.stats[statName].modifier
+        baseDie: characterState.stats[statName].baseDie,
+        bonusDie: characterState.stats[statName].bonusDie,
+        modifier: characterState.stats[statName].modifier
       };
       return result;
     }, {}),
-    strengths: state.strengths.map((strength) => ({
+    strengths: characterState.strengths.map((strength) => ({
       id: strength.id,
       name: strength.name,
       description: strength.description
@@ -1460,21 +1592,229 @@ function normalizeCharacterState(parsedState) {
 }
 
 /**
- * @returns {CharacterState}
+ * @returns {string}
  */
-function loadState() {
-  const savedState = window.localStorage.getItem(STORAGE_KEY);
+function createCharacterId() {
+  return crypto.randomUUID();
+}
 
-  if (!savedState) {
-    return createDefaultState();
+/**
+ * @param {string} characterId
+ */
+function setActiveCharacterId(characterId) {
+  currentCharacterId = characterId;
+  window.sessionStorage.setItem(ACTIVE_CHARACTER_SESSION_KEY, characterId);
+}
+
+/**
+ * @param {string} characterId
+ * @returns {string}
+ */
+function getCharacterRecordKey(characterId) {
+  return `${CHARACTER_RECORD_PREFIX}${characterId}`;
+}
+
+/**
+ * @returns {Promise<IDBDatabase>}
+ */
+function openCharacterDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(CHARACTER_DATABASE_NAME, CHARACTER_DATABASE_VERSION);
+
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+
+      if (!database.objectStoreNames.contains(CHARACTER_STORE_NAME)) {
+        database.createObjectStore(CHARACTER_STORE_NAME, { keyPath: "id" });
+      }
+    });
+
+    request.addEventListener("success", () => {
+      resolve(request.result);
+    });
+
+    request.addEventListener("error", () => {
+      reject(request.error);
+    });
+  });
+}
+
+/**
+ * @param {"readonly" | "readwrite"} mode
+ * @param {(store: IDBObjectStore) => IDBRequest | void} operation
+ * @returns {Promise<unknown>}
+ */
+async function runCharacterStoreOperation(mode, operation) {
+  const database = await openCharacterDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(CHARACTER_STORE_NAME, mode);
+    const store = transaction.objectStore(CHARACTER_STORE_NAME);
+    const request = operation(store);
+    let result;
+
+    if (request) {
+      request.addEventListener("success", () => {
+        result = request.result;
+      });
+
+      request.addEventListener("error", () => {
+        reject(request.error);
+      });
+    }
+
+    transaction.addEventListener("complete", () => {
+      database.close();
+      resolve(result);
+    });
+
+    transaction.addEventListener("error", () => {
+      database.close();
+      reject(transaction.error);
+    });
+  });
+}
+
+/**
+ * @returns {Promise<{ id: string, name: string, updatedAt: string }[]>}
+ */
+async function loadCharacterIndex() {
+  await migrateLocalStorageCharactersToIndexedDb();
+  const storedCharacters = await runCharacterStoreOperation("readonly", (store) => store.getAll());
+
+  if (!Array.isArray(storedCharacters)) {
+    return [];
   }
 
-  try {
-    /** @type {Partial<CharacterState>} */
-    const parsedState = JSON.parse(savedState);
-    return normalizeCharacterState(parsedState);
-  } catch (error) {
-    console.warn("Unable to load saved character sheet state.", error);
+  return storedCharacters
+    .filter((entry) => (
+      entry
+      && typeof entry.id === "string"
+      && typeof entry.name === "string"
+      && typeof entry.updatedAt === "string"
+    ))
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      updatedAt: entry.updatedAt
+    }))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+/**
+ * @param {string} characterId
+ * @returns {Promise<CharacterState | null>}
+ */
+async function loadStoredCharacter(characterId) {
+  await migrateLocalStorageCharactersToIndexedDb();
+  const storedCharacter = await runCharacterStoreOperation("readonly", (store) => store.get(characterId));
+
+  if (!storedCharacter || typeof storedCharacter !== "object" || !("state" in storedCharacter)) {
+    return null;
+  }
+
+  return normalizeCharacterState(storedCharacter.state);
+}
+
+/**
+ * @param {string} characterId
+ * @param {CharacterState} characterState
+ * @returns {Promise<void>}
+ */
+async function saveStoredCharacter(characterId, characterState) {
+  const updatedAt = new Date().toISOString();
+  const displayName = characterState.name.trim() || "Untitled Character";
+  await runCharacterStoreOperation("readwrite", (store) => (
+    store.put({
+      id: characterId,
+      name: displayName,
+      updatedAt,
+      state: serializeCharacterState(characterState)
+    })
+  ));
+}
+
+/**
+ * @param {string} characterId
+ * @returns {Promise<void>}
+ */
+async function deleteStoredCharacter(characterId) {
+  await runCharacterStoreOperation("readwrite", (store) => store.delete(characterId));
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function migrateLocalStorageCharactersToIndexedDb() {
+  if (hasMigratedLocalStorageCharacters) {
+    return;
+  }
+
+  hasMigratedLocalStorageCharacters = true;
+
+  const savedIndex = window.localStorage.getItem(CHARACTER_INDEX_KEY);
+
+  if (savedIndex) {
+    try {
+      const parsedIndex = JSON.parse(savedIndex);
+
+      if (Array.isArray(parsedIndex)) {
+        for (const entry of parsedIndex) {
+          if (!entry || typeof entry.id !== "string") {
+            continue;
+          }
+
+          const savedCharacter = window.localStorage.getItem(getCharacterRecordKey(entry.id));
+
+          if (!savedCharacter) {
+            continue;
+          }
+
+          const parsedCharacter = JSON.parse(savedCharacter);
+          await saveStoredCharacter(entry.id, normalizeCharacterState(parsedCharacter));
+          window.localStorage.removeItem(getCharacterRecordKey(entry.id));
+        }
+      }
+
+      window.localStorage.removeItem(CHARACTER_INDEX_KEY);
+    } catch (error) {
+      console.warn("Unable to migrate local character records.", error);
+    }
+  }
+}
+
+/**
+ * @returns {Promise<CharacterState>}
+ */
+async function loadState() {
+  await migrateLocalStorageCharactersToIndexedDb();
+
+  if (currentCharacterId) {
+    const savedCharacter = await loadStoredCharacter(currentCharacterId);
+
+    if (savedCharacter) {
+      return savedCharacter;
+    }
+  }
+
+  const legacyState = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+
+  if (legacyState) {
+    try {
+      /** @type {Partial<CharacterState>} */
+      const parsedLegacyState = JSON.parse(legacyState);
+      const migratedState = normalizeCharacterState(parsedLegacyState);
+      setActiveCharacterId(createCharacterId());
+      await saveStoredCharacter(currentCharacterId, migratedState);
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+      return migratedState;
+    } catch (error) {
+      console.warn("Unable to migrate saved character sheet state.", error);
+    }
+  }
+
+  if (!currentCharacterId) {
+    setActiveCharacterId(createCharacterId());
   }
 
   return createDefaultState();
@@ -1484,7 +1824,19 @@ function loadState() {
  * @param {string} statusText
  */
 function persistState(statusText) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (!currentCharacterId) {
+    setActiveCharacterId(createCharacterId());
+  }
+
+  saveStoredCharacter(currentCharacterId, state)
+    .then(() => {
+      renderStartupLocalCharacters();
+    })
+    .catch((error) => {
+      console.warn("Unable to autosave character.", error);
+      saveStatus.textContent = "Autosave failed.";
+    });
+
   saveStatus.textContent = statusText;
   window.clearTimeout(persistState.statusTimeout);
   persistState.statusTimeout = window.setTimeout(() => {
