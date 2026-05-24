@@ -13,6 +13,17 @@
   <div class="ambient-orb ambient-orb-b" aria-hidden="true"></div>
   <div class="ambient-orb ambient-orb-c" aria-hidden="true"></div>
 
+  <div id="startup-menu" class="startup-menu" role="dialog" aria-modal="true" aria-label="Start character menu" tabindex="-1">
+    <div class="startup-menu-card">
+      <p class="startup-menu-eyebrow">Imagination Land Character Sheet</p>
+      <div class="startup-menu-actions">
+        <button id="startup-load-character" class="primary-button startup-menu-button" type="button">Load Character</button>
+        <p class="startup-menu-divider">- OR -</p>
+        <button id="startup-create-character" class="ghost-button startup-menu-button" type="button">Create New Character</button>
+      </div>
+    </div>
+  </div>
+
   <main class="app-shell">
     <div class="sheet-character-underlay" aria-hidden="true"></div>
     <section class="hero-card">
@@ -46,7 +57,7 @@
               </div>
             </div>
           </div>
-          <p class="save-hint" id="save-status">Saved locally.</p>
+          <p class="save-hint" id="save-status">Saved locally. Use the "Save" button to load to another computer or browser.</p>
         </div>
       </section>
 
@@ -207,7 +218,7 @@
         <input class="strength-name" type="text" autocomplete="off">
       </label>
 
-      <label class="field">
+      <label class="field strength-description-field">
         <span>Description</span>
         <textarea class="strength-description" rows="3"></textarea>
       </label>

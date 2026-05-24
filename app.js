@@ -26,6 +26,31 @@ const STORAGE_KEY = "frohlich-character-sheet";
 const DIE_OPTIONS = ["d4", "d6", "d8", "d10", "d12", "d20"];
 const BONUS_OPTIONS = ["None", ...DIE_OPTIONS];
 const STAT_NAMES = ["Flight", "Charm", "Fight", "Grit", "Brain", "Brawn"];
+const DEFAULT_THEME = {
+  "--bg-top": "#1a1715",
+  "--bg-mid": "#3c322b",
+  "--bg-bottom": "#6b6652",
+  "--panel-ink": "#000000",
+  "--muted": "rgba(0, 0, 0, 0.74)",
+  "--line": "rgba(255, 255, 255, 0.28)",
+  "--line-strong": "rgba(255, 255, 255, 0.42)",
+  "--accent": "#8df0ff",
+  "--accent-strong": "#dff9ff",
+  "--gold": "#ffe1a8",
+  "--accent-wash": "rgba(141, 240, 255, 0.18)",
+  "--accent-border": "rgba(141, 240, 255, 0.88)",
+  "--accent-focus-ring": "rgba(141, 240, 255, 0.2)",
+  "--accent-glow": "rgba(74, 169, 201, 0.34)",
+  "--button-highlight-start": "rgba(235, 251, 255, 0.84)",
+  "--button-highlight-end": "rgba(176, 236, 247, 0.56)",
+  "--gold-wash": "rgba(255, 225, 168, 0.16)",
+  "--top-stat-wash": "rgba(255, 236, 199, 0.18)",
+  "--top-stat-ink": "#996919",
+  "--menu-surface-start": "rgba(255, 255, 255, 0.94)",
+  "--menu-surface-end": "rgba(238, 244, 249, 0.92)",
+  "--shadow": "0 28px 80px rgba(0, 10, 18, 0.32)",
+  "--inner-shadow": "inset 0 1px 0 rgba(255, 255, 255, 0.52)"
+};
 
 /** @type {CharacterState} */
 const DEFAULT_STATE = {
@@ -47,8 +72,13 @@ const DEFAULT_STATE = {
 
 /** @type {CharacterState} */
 let state = loadState();
+let themeRequestId = 0;
 
+const startupMenu = document.querySelector("#startup-menu");
+const startupLoadCharacterButton = document.querySelector("#startup-load-character");
+const startupCreateCharacterButton = document.querySelector("#startup-create-character");
 const appShell = document.querySelector(".app-shell");
+const rootStyle = document.documentElement.style;
 const nameInput = document.querySelector("#character-name");
 const adversityTokensInput = document.querySelector("#adversity-tokens");
 const statsList = document.querySelector("#stats-list");
@@ -94,9 +124,21 @@ function initialize() {
   renderSummary();
   setActiveSheetTab(sheetTabs[0]);
   bindStaticEvents();
+  setStartupMenuVisible(true);
 }
 
 function bindStaticEvents() {
+  startupLoadCharacterButton.addEventListener("click", () => {
+    loadCharacterInput.click();
+  });
+
+  startupCreateCharacterButton.addEventListener("click", () => {
+    setStartupMenuVisible(false);
+    closeSheetMenu();
+    applyState(createDefaultState(), "New character started.");
+    nameInput.focus();
+  });
+
   nameInput.addEventListener("input", () => {
     state.name = nameInput.value.trimStart();
     persistState("Name updated.");
@@ -174,6 +216,7 @@ function bindStaticEvents() {
       const fileContents = await readFileAsText(file);
       const parsedState = JSON.parse(fileContents);
       applyState(normalizeCharacterState(parsedState), "Character loaded.");
+      setStartupMenuVisible(false);
     } catch (error) {
       console.warn("Unable to load character file.", error);
       saveStatus.textContent = "Load failed.";
@@ -276,11 +319,13 @@ function renderCharacterArt() {
 
   characterBackgroundBlur.style.backgroundImage = backgroundImageValue;
   characterBackgroundFocus.style.backgroundImage = backgroundImageValue;
-  sheetCharacterUnderlay.style.backgroundImage = backgroundImageValue;
   characterBackgroundBlur.style.opacity = hasCharacterImage ? "" : "0";
+  sheetCharacterUnderlay.style.backgroundImage = "none";
   characterBackgroundFocus.style.opacity = hasCharacterImage ? "" : "0";
-  sheetCharacterUnderlay.style.opacity = hasCharacterImage ? "" : "0";
+  sheetCharacterUnderlay.style.opacity = "0";
+  previewCharacterArtButton.disabled = !hasCharacterImage;
   clearImageButton.disabled = !state.characterImage;
+  void updateCharacterTheme(state.characterImage);
 }
 
 function downloadCharacterFile() {
@@ -301,12 +346,27 @@ function downloadCharacterFile() {
   persistState("Character saved.");
 }
 
+/**
+ * @param {boolean} isVisible
+ */
+function setStartupMenuVisible(isVisible) {
+  startupMenu.hidden = !isVisible;
+  appShell.inert = isVisible;
+  document.body.classList.toggle("startup-menu-open", isVisible);
+
+  if (isVisible) {
+    window.requestAnimationFrame(() => {
+      startupMenu.focus();
+    });
+  }
+}
+
 function closeSheetMenu() {
   setSheetMenuOpen(false);
 }
 
 function getIdleStatusText() {
-  return "Saved locally.";
+  return "Saved locally. Save to file to load on another device or browser.";
 }
 
 /**
@@ -325,6 +385,369 @@ function setTransientStatus(statusText) {
  */
 function toRenderableImageUrl(imageValue) {
   return imageValue;
+}
+
+/**
+ * @param {string} imageValue
+ * @returns {Promise<void>}
+ */
+async function updateCharacterTheme(imageValue) {
+  const currentRequestId = ++themeRequestId;
+
+  if (!imageValue) {
+    applyThemeVariables(DEFAULT_THEME);
+    return;
+  }
+
+  try {
+    const nextTheme = await buildThemeFromImage(imageValue);
+
+    if (currentRequestId !== themeRequestId) {
+      return;
+    }
+
+    applyThemeVariables(nextTheme);
+  } catch (error) {
+    console.warn("Unable to derive theme from character image.", error);
+
+    if (currentRequestId !== themeRequestId) {
+      return;
+    }
+
+    applyThemeVariables(DEFAULT_THEME);
+  }
+}
+
+/**
+ * @param {Record<string, string>} theme
+ */
+function applyThemeVariables(theme) {
+  for (const [name, value] of Object.entries(theme)) {
+    rootStyle.setProperty(name, value);
+  }
+}
+
+/**
+ * @param {string} imageValue
+ * @returns {Promise<Record<string, string>>}
+ */
+async function buildThemeFromImage(imageValue) {
+  const sampledColors = await sampleImageColors(imageValue);
+  const palette = buildPaletteAnchors(sampledColors);
+  const darkColor = tintToRange(palette.dark, 0.12, 0.16, 0.12, 0.42);
+  const midColor = tintToRange(mixColors(palette.dark, palette.mid, 0.55), 0.2, 0.28, 0.12, 0.46);
+  const bottomColor = tintToRange(mixColors(palette.mid, palette.light, 0.4), 0.34, 0.46, 0.12, 0.4);
+  const accentColor = tintToRange(palette.accent, 0.52, 0.64, 0.34, 0.82);
+  const accentLight = tintToRange(mixColors(accentColor, palette.light, 0.76), 0.82, 0.92, 0.12, 0.34);
+  const warmColor = tintToRange(palette.warm, 0.62, 0.76, 0.28, 0.66);
+  const inkColor = tintToRange(darkColor, 0.08, 0.1, 0.08, 0.24);
+  const edgeColor = tintToRange(mixColors(accentLight, accentColor, 0.28), 0.72, 0.84, 0.12, 0.3);
+  const accentGlowColor = tintToRange(mixColors(accentColor, darkColor, 0.35), 0.32, 0.42, 0.2, 0.52);
+  const buttonStart = tintToRange(mixColors(accentColor, accentLight, 0.78), 0.86, 0.94, 0.1, 0.28);
+  const buttonEnd = tintToRange(mixColors(accentColor, accentLight, 0.46), 0.64, 0.8, 0.22, 0.48);
+  const menuSurfaceStart = tintToRange(mixColors(accentLight, palette.light, 0.55), 0.9, 0.96, 0.08, 0.22);
+  const menuSurfaceEnd = tintToRange(mixColors(accentLight, midColor, 0.22), 0.84, 0.92, 0.1, 0.26);
+  const topStatInk = tintToRange(mixColors(warmColor, darkColor, 0.42), 0.28, 0.4, 0.34, 0.76);
+
+  return {
+    "--bg-top": toCssRgb(darkColor),
+    "--bg-mid": toCssRgb(midColor),
+    "--bg-bottom": toCssRgb(bottomColor),
+    "--panel-ink": toCssRgb(inkColor),
+    "--muted": toCssRgba(inkColor, 0.74),
+    "--line": toCssRgba(edgeColor, 0.28),
+    "--line-strong": toCssRgba(edgeColor, 0.42),
+    "--accent": toCssRgb(accentColor),
+    "--accent-strong": toCssRgb(accentLight),
+    "--gold": toCssRgb(warmColor),
+    "--accent-wash": toCssRgba(accentColor, 0.18),
+    "--accent-border": toCssRgba(accentColor, 0.88),
+    "--accent-focus-ring": toCssRgba(accentColor, 0.2),
+    "--accent-glow": toCssRgba(accentGlowColor, 0.34),
+    "--button-highlight-start": toCssRgba(buttonStart, 0.84),
+    "--button-highlight-end": toCssRgba(buttonEnd, 0.56),
+    "--gold-wash": toCssRgba(warmColor, 0.16),
+    "--top-stat-wash": toCssRgba(warmColor, 0.18),
+    "--top-stat-ink": toCssRgb(topStatInk),
+    "--menu-surface-start": toCssRgba(menuSurfaceStart, 0.94),
+    "--menu-surface-end": toCssRgba(menuSurfaceEnd, 0.92),
+    "--shadow": `0 28px 80px ${toCssRgba(darkColor, 0.32)}`,
+    "--inner-shadow": `inset 0 1px 0 ${toCssRgba(accentLight, 0.52)}`
+  };
+}
+
+/**
+ * @param {string} imageValue
+ * @returns {Promise<Array<ReturnType<typeof createColor>>>}
+ */
+function sampleImageColors(imageValue) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+
+    image.addEventListener("load", () => {
+      const longestSide = Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height, 1);
+      const scale = Math.min(1, 48 / longestSide);
+      const width = Math.max(12, Math.round((image.naturalWidth || image.width) * scale));
+      const height = Math.max(12, Math.round((image.naturalHeight || image.height) * scale));
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+
+      if (!context) {
+        reject(new Error("Unable to sample image colors."));
+        return;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(image, 0, 0, width, height);
+
+      const imageData = context.getImageData(0, 0, width, height).data;
+      /** @type {Map<string, { count: number, r: number, g: number, b: number }>} */
+      const buckets = new Map();
+
+      for (let index = 0; index < imageData.length; index += 4) {
+        const alpha = imageData[index + 3];
+
+        if (alpha < 160) {
+          continue;
+        }
+
+        const red = imageData[index];
+        const green = imageData[index + 1];
+        const blue = imageData[index + 2];
+        const key = `${Math.round(red / 24)}-${Math.round(green / 24)}-${Math.round(blue / 24)}`;
+        const bucket = buckets.get(key) || { count: 0, r: 0, g: 0, b: 0 };
+
+        bucket.count += 1;
+        bucket.r += red;
+        bucket.g += green;
+        bucket.b += blue;
+        buckets.set(key, bucket);
+      }
+
+      const colors = Array.from(buckets.values(), (bucket) => createColor(
+        bucket.r / bucket.count,
+        bucket.g / bucket.count,
+        bucket.b / bucket.count,
+        bucket.count
+      ))
+        .filter((color) => color.count >= 2)
+        .sort((left, right) => right.count - left.count);
+
+      resolve(colors.length > 0 ? colors : [createColor(26, 23, 21, 1)]);
+    });
+
+    image.addEventListener("error", () => {
+      reject(new Error("Unable to load character image for theming."));
+    });
+
+    image.src = imageValue;
+  });
+}
+
+/**
+ * @param {Array<ReturnType<typeof createColor>>} colors
+ */
+function buildPaletteAnchors(colors) {
+  const fallback = colors[0];
+
+  return {
+    dark: selectColor(colors, (color) => color.count * (1.1 - color.l) * 1.8 + color.s * 0.25, fallback),
+    mid: selectColor(colors, (color) => color.count * (1 - Math.abs(color.l - 0.42)) * (0.65 + color.s), fallback),
+    accent: selectColor(colors, (color) => color.count * (0.45 + color.s * 1.9) * (1 - Math.abs(color.l - 0.56)), fallback),
+    light: selectColor(colors, (color) => color.count * (0.3 + color.l * 1.2) * (0.7 + color.s * 0.35), fallback),
+    warm: selectColor(colors, (color) => {
+      const warmth = 1 - hueDistance(color.h, 42) / 180;
+      return color.count * (0.4 + warmth * 1.8) * (0.45 + color.s);
+    }, fallback)
+  };
+}
+
+/**
+ * @param {Array<ReturnType<typeof createColor>>} colors
+ * @param {(color: ReturnType<typeof createColor>) => number} scoreColor
+ * @param {ReturnType<typeof createColor>} fallback
+ */
+function selectColor(colors, scoreColor, fallback) {
+  let bestColor = fallback;
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const color of colors) {
+    const score = scoreColor(color);
+
+    if (score > bestScore) {
+      bestColor = color;
+      bestScore = score;
+    }
+  }
+
+  return bestColor;
+}
+
+/**
+ * @param {number} red
+ * @param {number} green
+ * @param {number} blue
+ * @param {number} count
+ */
+function createColor(red, green, blue, count = 1) {
+  const r = clampColor(red);
+  const g = clampColor(green);
+  const b = clampColor(blue);
+  const [h, s, l] = rgbToHsl(r, g, b);
+
+  return { r, g, b, h, s, l, count };
+}
+
+/**
+ * @param {ReturnType<typeof createColor>} left
+ * @param {ReturnType<typeof createColor>} right
+ * @param {number} amount
+ */
+function mixColors(left, right, amount) {
+  const mixAmount = clamp(amount, 0, 1);
+
+  return createColor(
+    left.r + (right.r - left.r) * mixAmount,
+    left.g + (right.g - left.g) * mixAmount,
+    left.b + (right.b - left.b) * mixAmount
+  );
+}
+
+/**
+ * @param {ReturnType<typeof createColor>} color
+ * @param {number} minLightness
+ * @param {number} maxLightness
+ * @param {number} minSaturation
+ * @param {number} maxSaturation
+ */
+function tintToRange(color, minLightness, maxLightness, minSaturation, maxSaturation) {
+  return createColor(...hslToRgb(
+    color.h,
+    clamp(color.s, minSaturation, maxSaturation),
+    clamp(color.l, minLightness, maxLightness)
+  ));
+}
+
+/**
+ * @param {number} hue
+ * @param {number} targetHue
+ * @returns {number}
+ */
+function hueDistance(hue, targetHue) {
+  const delta = Math.abs(hue - targetHue) % 360;
+  return delta > 180 ? 360 - delta : delta;
+}
+
+/**
+ * @param {number} red
+ * @param {number} green
+ * @param {number} blue
+ * @returns {[number, number, number]}
+ */
+function rgbToHsl(red, green, blue) {
+  const r = red / 255;
+  const g = green / 255;
+  const b = blue / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  const delta = max - min;
+
+  if (delta === 0) {
+    return [0, 0, lightness];
+  }
+
+  const saturation = delta / (1 - Math.abs(2 * lightness - 1));
+  let hue = 0;
+
+  if (max === r) {
+    hue = 60 * (((g - b) / delta) % 6);
+  } else if (max === g) {
+    hue = 60 * (((b - r) / delta) + 2);
+  } else {
+    hue = 60 * (((r - g) / delta) + 4);
+  }
+
+  return [hue < 0 ? hue + 360 : hue, saturation, lightness];
+}
+
+/**
+ * @param {number} hue
+ * @param {number} saturation
+ * @param {number} lightness
+ * @returns {[number, number, number]}
+ */
+function hslToRgb(hue, saturation, lightness) {
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const segment = hue / 60;
+  const secondary = chroma * (1 - Math.abs((segment % 2) - 1));
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (segment >= 0 && segment < 1) {
+    r = chroma;
+    g = secondary;
+  } else if (segment < 2) {
+    r = secondary;
+    g = chroma;
+  } else if (segment < 3) {
+    g = chroma;
+    b = secondary;
+  } else if (segment < 4) {
+    g = secondary;
+    b = chroma;
+  } else if (segment < 5) {
+    r = secondary;
+    b = chroma;
+  } else {
+    r = chroma;
+    b = secondary;
+  }
+
+  const match = lightness - chroma / 2;
+
+  return [
+    (r + match) * 255,
+    (g + match) * 255,
+    (b + match) * 255
+  ];
+}
+
+/**
+ * @param {ReturnType<typeof createColor>} color
+ * @returns {string}
+ */
+function toCssRgb(color) {
+  return `rgb(${color.r}, ${color.g}, ${color.b})`;
+}
+
+/**
+ * @param {ReturnType<typeof createColor>} color
+ * @param {number} alpha
+ * @returns {string}
+ */
+function toCssRgba(color, alpha) {
+  return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
+}
+
+/**
+ * @param {number} value
+ * @returns {number}
+ */
+function clampColor(value) {
+  return Math.round(clamp(value, 0, 255));
+}
+
+/**
+ * @param {number} value
+ * @param {number} minimum
+ * @param {number} maximum
+ * @returns {number}
+ */
+function clamp(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 /**
@@ -363,10 +786,12 @@ function applyState(nextState, statusText) {
 
 function showCharacterArtPreview() {
   appShell.classList.add("is-previewing-character");
+  document.body.classList.add("is-previewing-character");
 }
 
 function hideCharacterArtPreview() {
   appShell.classList.remove("is-previewing-character");
+  document.body.classList.remove("is-previewing-character");
 }
 
 /**
@@ -458,7 +883,7 @@ function renderSummary() {
   summaryStack.append(rankingCard);
 
   const strengthsCard = createSummaryListCard(
-    "Named Strengths",
+    "Current Strengths",
     namedStrengths.map((strength) => ({
       label: strength.name,
       value: strength.description.trim()

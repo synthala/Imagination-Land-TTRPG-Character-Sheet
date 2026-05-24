@@ -15,6 +15,17 @@
   --accent: #8df0ff;
   --accent-strong: #dff9ff;
   --gold: #ffe1a8;
+  --accent-wash: rgba(141, 240, 255, 0.18);
+  --accent-border: rgba(141, 240, 255, 0.88);
+  --accent-focus-ring: rgba(141, 240, 255, 0.2);
+  --accent-glow: rgba(74, 169, 201, 0.34);
+  --button-highlight-start: rgba(235, 251, 255, 0.84);
+  --button-highlight-end: rgba(176, 236, 247, 0.56);
+  --gold-wash: rgba(255, 225, 168, 0.16);
+  --top-stat-wash: rgba(255, 236, 199, 0.18);
+  --top-stat-ink: #996919;
+  --menu-surface-start: rgba(255, 255, 255, 0.94);
+  --menu-surface-end: rgba(238, 244, 249, 0.92);
   --shadow: 0 28px 80px rgba(0, 10, 18, 0.32);
   --inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
 }
@@ -41,6 +52,10 @@ body {
   font-family: var(--font-ui);
 }
 
+body.startup-menu-open {
+  overflow: hidden;
+}
+
 body::before,
 body::after {
   content: "";
@@ -57,6 +72,11 @@ body::before {
 
 body::after {
   backdrop-filter: blur(2px);
+}
+
+body.is-previewing-character::after {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .character-background {
@@ -76,13 +96,19 @@ body::after {
   opacity: 0.52;
 }
 
+body.is-previewing-character .character-background-blur {
+  opacity: 0;
+}
+
 .character-background-focus {
   z-index: 0;
-  background-position: center 52%;
-  background-size: min(70vw, 980px) auto;
-  filter: drop-shadow(0 28px 48px rgba(3, 11, 18, 0.34));
-  opacity: 0.18;
-  mix-blend-mode: soft-light;
+  inset: 28px 0;
+  background-position: center center;
+  background-size: contain;
+  filter: saturate(1.04) contrast(1.02) drop-shadow(0 24px 40px rgba(3, 11, 18, 0.28));
+  opacity: 0.34;
+  mix-blend-mode: normal;
+  transition: opacity 180ms ease, transform 220ms ease, filter 220ms ease;
 }
 
 .ambient-orb {
@@ -122,7 +148,88 @@ body::after {
   gap: 24px;
 }
 
+.startup-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 12, 14, 0.36);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.startup-menu-card {
+  width: min(460px, 100%);
+  padding: 32px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.22), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(239, 245, 249, 0.68));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 28px 60px rgba(0, 8, 15, 0.28);
+  text-align: center;
+}
+
+.startup-menu-eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(14, 34, 53, 0.76);
+}
+
+.startup-menu-card h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.startup-menu-actions {
+  display: grid;
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.startup-menu-button {
+  width: 100%;
+  min-height: 56px;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
+  color: #000000;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+.startup-menu-button:hover,
+.startup-menu-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  color: #0b2b43;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 32px var(--accent-glow);
+}
+
+.startup-menu-divider {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(14, 34, 53, 0.68);
+}
+
 .sheet-character-underlay {
+  display: none;
   position: absolute;
   inset: 24px 0 24px;
   z-index: 0;
@@ -136,12 +243,6 @@ body::after {
   -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 88%, transparent 100%);
   mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 88%, transparent 100%);
   transition: opacity 180ms ease, transform 220ms ease, filter 220ms ease;
-}
-
-.app-shell.is-previewing-character .sheet-character-underlay {
-  opacity: 0.88;
-  transform: scale(1.02);
-  filter: drop-shadow(0 34px 46px rgba(4, 14, 24, 0.14));
 }
 
 .app-shell.is-previewing-character .hero-card,
@@ -176,6 +277,12 @@ body::after {
 
 .app-shell.is-previewing-character .hero-actions {
   opacity: 1;
+}
+
+body.is-previewing-character .character-background-focus {
+  opacity: 1;
+  transform: scale(1);
+  filter: brightness(1) saturate(1) contrast(1) drop-shadow(0 24px 36px rgba(4, 14, 24, 0.18));
 }
 
 .app-shell.is-previewing-character .stat-row,
@@ -220,7 +327,7 @@ body::after {
   inset: 0;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.34), transparent 28%),
-    linear-gradient(320deg, rgba(141, 240, 255, 0.18), transparent 40%);
+    linear-gradient(320deg, var(--accent-wash), transparent 40%);
 }
 
 .hero-card::after,
@@ -404,9 +511,9 @@ body::after {
   gap: 6px;
   min-width: 200px;
   padding: 8px;
-  border: 1px solid rgba(210, 223, 235, 0.95);
+  border: 1px solid var(--line-strong);
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(238, 244, 249, 0.92));
+  background: linear-gradient(180deg, var(--menu-surface-start), var(--menu-surface-end));
   background-clip: padding-box;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
@@ -433,9 +540,9 @@ body::after {
 .menu-button {
   width: 100%;
   padding: 11px 14px;
-  border: 1px solid rgba(210, 223, 235, 0.9);
+  border: 1px solid var(--line-strong);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.76);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
   color: var(--panel-ink);
   font-family: var(--font-ui);
   font-size: 0.95rem;
@@ -444,14 +551,20 @@ body::after {
   text-align: left;
   text-transform: none;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
     0 10px 18px rgba(5, 18, 31, 0.08);
 }
 
 .menu-button:hover,
 .menu-button:focus-visible {
-  transform: none;
-  background: #ffffff;
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  color: #0b2b43;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 32px var(--accent-glow);
 }
 
 .hero-topline {
@@ -474,19 +587,37 @@ body::after {
   padding: 10px 16px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.1));
   color: #000000;
   font-family: var(--font-ui);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.sheet-tab:hover,
+.sheet-tab:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  color: #0b2b43;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 32px var(--accent-glow);
 }
 
 .sheet-tab[aria-selected="true"] {
-  background: linear-gradient(180deg, #ffffff, #eef4f9);
-  border-color: rgba(210, 223, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  color: #0b2b43;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 32px var(--accent-glow);
 }
 
 .sheet-tab-panel[hidden] {
@@ -556,7 +687,7 @@ body::after {
 }
 
 .compact-pill input:focus {
-  box-shadow: 0 0 0 3px rgba(141, 240, 255, 0.18);
+  box-shadow: 0 0 0 3px var(--accent-wash);
 }
 
 .compact-pill-panel {
@@ -638,14 +769,14 @@ body::after {
   z-index: 30;
   overflow: visible;
   background:
-    radial-gradient(circle at top right, rgba(141, 240, 255, 0.14), transparent 22%),
+    radial-gradient(circle at top right, var(--accent-wash), transparent 22%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08));
 }
 
 .panel-secondary {
   z-index: 8;
   background:
-    radial-gradient(circle at top left, rgba(255, 225, 168, 0.16), transparent 24%),
+    radial-gradient(circle at top left, var(--gold-wash), transparent 24%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.08));
 }
 
@@ -730,10 +861,10 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: rgba(141, 240, 255, 0.88);
+  border-color: var(--accent-border);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 0 0 4px rgba(141, 240, 255, 0.2),
+    0 0 0 4px var(--accent-focus-ring),
     0 18px 34px rgba(8, 32, 52, 0.12);
   transform: translateY(-1px);
 }
@@ -809,12 +940,12 @@ textarea:focus {
 .stat-row[data-rank="1"] {
   border-color: rgba(255, 238, 199, 0.74);
   background:
-    radial-gradient(circle at top left, rgba(255, 236, 199, 0.18), transparent 35%),
+    radial-gradient(circle at top left, var(--top-stat-wash), transparent 35%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.14));
 }
 
 .stat-row[data-rank="1"] .stat-rank {
-  color: #996919;
+  color: var(--top-stat-ink);
 }
 
 .stat-row[data-rank="2"] .stat-rank,
@@ -881,11 +1012,11 @@ textarea:focus {
   position: relative;
   width: 100%;
   padding: 12px 38px 12px 14px;
-  border: 1px solid rgba(210, 223, 235, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff, #eef4f9);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
     0 16px 32px rgba(10, 34, 54, 0.08);
   color: #000000;
   text-align: center;
@@ -893,6 +1024,19 @@ textarea:focus {
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.01em;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.glass-select-toggle:hover,
+.glass-select-toggle:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  color: #0b2b43;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 32px var(--accent-glow);
 }
 
 .glass-select-toggle::after {
@@ -920,9 +1064,9 @@ textarea:focus {
   display: grid;
   gap: 6px;
   padding: 8px;
-  border: 1px solid rgba(210, 223, 235, 0.95);
+  border: 1px solid var(--line-strong);
   border-radius: 20px;
-  background: linear-gradient(180deg, #ffffff, #eef4f9);
+  background: linear-gradient(180deg, var(--menu-surface-start), var(--menu-surface-end));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.98),
     0 22px 40px rgba(3, 12, 18, 0.18);
@@ -948,22 +1092,39 @@ textarea:focus {
 .glass-select-option {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid rgba(210, 223, 235, 0.9);
+  border: 1px solid var(--line-strong);
   border-radius: 14px;
-  background: #ffffff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
   color: #000000;
   font-family: var(--font-ui);
   font-size: 0.94rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   text-align: center;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    0 10px 18px rgba(5, 18, 31, 0.08);
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
 .glass-select-option:hover,
-.glass-select-option:focus-visible,
+.glass-select-option:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  color: #0b2b43;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 32px var(--accent-glow);
+}
+
 .glass-select-option.is-selected {
-  background: #f5f9fc;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.54),
+    0 10px 18px rgba(5, 18, 31, 0.08);
 }
 
 .snapshot-card {
@@ -1081,6 +1242,20 @@ textarea:focus {
   padding: 18px;
 }
 
+.strength-card .field > span {
+  display: block;
+  text-align: left;
+}
+
+.strength-description-field > span {
+  padding-top: 4px;
+}
+
+.strength-name,
+.strength-description {
+  text-align: left;
+}
+
 .strengths-panel {
   margin-top: 24px;
 }
@@ -1120,13 +1295,10 @@ textarea:focus {
 }
 
 .primary-button {
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  background:
-    linear-gradient(180deg, rgba(235, 251, 255, 0.84), rgba(176, 236, 247, 0.56));
-  color: #0b2b43;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.86),
-    0 16px 28px rgba(74, 169, 201, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
+  color: #000000;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
 }
 
 .ghost-button {
@@ -1139,12 +1311,12 @@ textarea:focus {
 .icon-button {
   border: 1px solid rgba(255, 255, 255, 0.3);
   padding: 10px 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.18));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
   color: var(--panel-ink);
   font-family: var(--font-ui);
   font-size: 0.9rem;
   font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
 }
 
 .icon-button:disabled {
@@ -1153,15 +1325,19 @@ textarea:focus {
 }
 
 .primary-button:hover,
+.primary-button:focus-visible,
 .ghost-button:hover,
-.icon-button:hover {
+.ghost-button:focus-visible,
+.icon-button:hover,
+.icon-button:focus-visible {
   transform: translateY(-1px);
-}
-
-.primary-button:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  color: #0b2b43;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 18px 32px rgba(74, 169, 201, 0.34);
+    0 18px 32px var(--accent-glow);
 }
 
 .empty-message {
@@ -1212,9 +1388,10 @@ textarea:focus {
   }
 
   .character-background-focus {
-    background-position: center 60%;
-    background-size: min(100vw, 720px) auto;
-    opacity: 0.14;
+    inset: 18px 0;
+    background-position: center center;
+    background-size: contain;
+    opacity: 0.28;
   }
 
   .sheet-character-underlay {
