@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Imagination Land Character Sheet</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="character-background character-background-blur" aria-hidden="true"></div>
+  <div class="character-background character-background-focus" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-a" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-b" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-c" aria-hidden="true"></div>
+
+  <main class="app-shell">
+    <div class="sheet-character-underlay" aria-hidden="true"></div>
+    <section class="hero-card">
+        <div class="hero-copy">
+          <div class="hero-topline">
+            <p class="eyebrow">Imagination Land Character Sheet</p>
+          </div>
+
+          <label class="hero-name-field" for="character-name">
+            <span class="sr-only">Character Name</span>
+            <input id="character-name" class="hero-name-input" type="text" autocomplete="off" placeholder="Character Name">
+          </label>
+        </div>
+        <div class="hero-actions">
+          <div class="hero-toolbar">
+            <button id="preview-character-art" class="icon-button preview-button" type="button" aria-label="Preview character art" title="Preview character art">
+              <span class="eye-icon" aria-hidden="true"></span>
+            </button>
+            <button id="save-character-button" class="icon-button toolbar-icon-button" type="button" aria-label="Save character" title="Save character">
+              <span class="save-icon" aria-hidden="true"></span>
+            </button>
+            <button id="load-character-button" class="icon-button toolbar-icon-button" type="button" aria-label="Load character" title="Load character">
+              <span class="load-icon" aria-hidden="true"></span>
+            </button>
+            <div class="sheet-menu">
+              <button id="sheet-menu-toggle" class="ghost-button" type="button" aria-expanded="false" aria-controls="sheet-menu-panel">Menu</button>
+              <div id="sheet-menu-panel" class="sheet-menu-panel">
+                <button id="upload-image-button" class="menu-button" type="button">Upload Image</button>
+                <button id="clear-image-button" class="menu-button" type="button">Clear Image</button>
+                <button id="new-character-button" class="menu-button" type="button">New Character</button>
+              </div>
+            </div>
+          </div>
+          <p class="save-hint" id="save-status">Saved locally.</p>
+        </div>
+      </section>
+
+      <div class="sheet-tabs" role="tablist" aria-label="Character sheet sections">
+        <button type="button" class="sheet-tab" id="character-sheet-tab" role="tab" aria-selected="true" aria-controls="character-sheet-panel">Character Sheet</button>
+        <button type="button" class="sheet-tab" id="notes-backstory-tab" role="tab" aria-selected="false" aria-controls="notes-backstory-panel">Notes/Backstory</button>
+        <button type="button" class="sheet-tab" id="inventory-tab" role="tab" aria-selected="false" aria-controls="inventory-panel">Inventory</button>
+      </div>
+
+      <div class="sheet-tab-panel" id="character-sheet-panel" role="tabpanel" aria-labelledby="character-sheet-tab">
+        <section class="sheet-grid">
+          <article class="panel panel-primary">
+            <header class="panel-header">
+              <div>
+                <h2>Character Attributes</h2>
+              </div>
+              <label class="compact-pill compact-pill-panel" for="adversity-tokens">
+                <span>Adversity Tokens</span>
+                <span class="number-stepper">
+                  <input id="adversity-tokens" type="number" min="0" step="1" inputmode="numeric">
+                  <span class="stepper-controls" aria-hidden="true">
+                    <button class="stepper-button stepper-button-up" type="button" tabindex="-1" data-step="up">
+                      <span class="stepper-chevron"></span>
+                    </button>
+                    <button class="stepper-button stepper-button-down" type="button" tabindex="-1" data-step="down">
+                      <span class="stepper-chevron"></span>
+                    </button>
+                  </span>
+                </span>
+              </label>
+            </header>
+
+            <section class="stats-section" aria-labelledby="stats-heading">
+              <div class="section-heading">
+              </div>
+
+              <div id="stats-list" class="stats-list" aria-live="polite"></div>
+            </section>
+          </article>
+
+          <aside class="panel panel-secondary">
+            <header class="panel-header">
+              <div>
+                <h2>Snapshot</h2>
+              </div>
+            </header>
+
+            <div class="snapshot-card">
+              <p class="snapshot-label">Current Lead</p>
+              <p id="best-stat" class="snapshot-value">Flight</p>
+              <p id="best-stat-detail" class="snapshot-detail">d20 + d4 + 2</p>
+              <div class="snapshot-metrics">
+                <div class="snapshot-chip">
+                  <span>Adversity Tokens</span>
+                  <strong id="snapshot-adversity">0</strong>
+                </div>
+                <div class="snapshot-chip">
+                  <span>Strengths</span>
+                  <strong id="snapshot-strength-count">3</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="summary-stack" id="summary-stack" aria-live="polite"></div>
+          </aside>
+        </section>
+
+        <section class="panel strengths-panel">
+          <header class="panel-header">
+            <div>
+              <p class="panel-label">Strengths</p>
+              <h2>Strength List</h2>
+            </div>
+            <button id="add-strength" class="primary-button" type="button">Add Strength</button>
+          </header>
+
+          <div id="strengths-list" class="strengths-list" aria-live="polite"></div>
+        </section>
+      </div>
+
+      <div class="sheet-tab-panel" id="notes-backstory-panel" role="tabpanel" aria-labelledby="notes-backstory-tab" hidden>
+        <section class="panel writing-panel">
+          <header class="panel-header">
+            <div>
+              <h2>Notes/Backstory</h2>
+            </div>
+          </header>
+          <textarea id="notes-backstory" class="writing-area" rows="18" placeholder="Character notes, backstory, relationships, goals, reminders"></textarea>
+        </section>
+      </div>
+
+    <div class="sheet-tab-panel" id="inventory-panel" role="tabpanel" aria-labelledby="inventory-tab" hidden>
+      <section class="panel writing-panel">
+        <header class="panel-header">
+          <div>
+            <h2>Inventory</h2>
+          </div>
+        </header>
+        <textarea id="inventory-notes" class="writing-area" rows="18" placeholder="Put ya stuffs here..."></textarea>
+      </section>
+    </div>
+  </main>
+
+  <template id="stat-row-template">
+    <article class="stat-row">
+      <div class="stat-row-copy">
+        <div class="stat-heading">
+          <h3 class="stat-name"></h3>
+          <p class="stat-rank"></p>
+        </div>
+        <p class="stat-formula"></p>
+      </div>
+
+      <div class="stat-controls">
+        <label class="field field-inline">
+          <span>Base</span>
+          <div class="glass-select stat-base-die">
+            <button class="glass-select-toggle" type="button" aria-expanded="false"></button>
+            <div class="glass-select-menu"></div>
+          </div>
+        </label>
+
+        <label class="field field-inline">
+          <span>Bonus</span>
+          <div class="glass-select stat-bonus-die">
+            <button class="glass-select-toggle" type="button" aria-expanded="false"></button>
+            <div class="glass-select-menu"></div>
+          </div>
+        </label>
+
+        <label class="field field-inline field-inline-small">
+          <span>Mod</span>
+          <span class="number-stepper">
+            <input class="stat-modifier" type="number" step="1" inputmode="numeric">
+            <span class="stepper-controls" aria-hidden="true">
+              <button class="stepper-button stepper-button-up" type="button" tabindex="-1" data-step="up">
+                <span class="stepper-chevron"></span>
+              </button>
+              <button class="stepper-button stepper-button-down" type="button" tabindex="-1" data-step="down">
+                <span class="stepper-chevron"></span>
+              </button>
+            </span>
+          </span>
+        </label>
+      </div>
+    </article>
+  </template>
+
+  <template id="strength-template">
+    <article class="strength-card">
+      <div class="strength-card-header">
+        <p class="strength-tag">Strength</p>
+        <button class="icon-button remove-strength" type="button" aria-label="Remove strength">Remove</button>
+      </div>
+
+      <label class="field">
+        <span>Name</span>
+        <input class="strength-name" type="text" autocomplete="off">
+      </label>
+
+      <label class="field">
+        <span>Description</span>
+        <textarea class="strength-description" rows="3"></textarea>
+      </label>
+    </article>
+  </template>
+
+  <input id="character-image-input" class="sr-only" type="file" accept="image/*">
+  <input id="load-character-input" class="sr-only" type="file" accept=".json,application/json">
+
+  <script src="app.js"></script>
+</body>
+</html>
