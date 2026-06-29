@@ -1122,7 +1122,7 @@ textarea:focus {
 
 .stat-controls {
   display: grid;
-  grid-template-columns: minmax(82px, 0.7fr) repeat(2, minmax(0, 1fr)) minmax(82px, 0.7fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   overflow: visible;
 }
@@ -1136,9 +1136,11 @@ textarea:focus {
   padding-right: 28px;
 }
 
-.stat-base-count-field::before {
-  content: "";
-  min-height: 0.78rem;
+.base-die-control {
+  display: grid;
+  grid-template-columns: minmax(52px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+  overflow: visible;
 }
 
 .stat-base-count-display,
