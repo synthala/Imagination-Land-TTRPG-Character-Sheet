@@ -1,5 +1,6 @@
 /**
  * @typedef {{
+ *   baseCount: number,
  *   baseDie: string,
  *   bonusDie: string,
  *   modifier: number
@@ -27,6 +28,7 @@ const LEGACY_STORAGE_KEY = "frohlich-character-sheet";
 const CHARACTER_RECORD_PREFIX = "frohlich-character-sheet:character:";
 const CHARACTER_INDEX_KEY = "frohlich-character-sheet:character-index";
 const ACTIVE_CHARACTER_SESSION_KEY = "frohlich-character-sheet:active-character-id";
+const ACTIVE_SHEET_TAB_KEY = "frohlich-character-sheet:active-sheet-tab";
 const CHARACTER_DATABASE_NAME = "frohlich-character-sheet-db";
 const CHARACTER_DATABASE_VERSION = 1;
 const CHARACTER_STORE_NAME = "characters";
@@ -67,12 +69,12 @@ const DEFAULT_STATE = {
   notesBackstory: "",
   inventory: "",
   stats: {
-    Flight: { baseDie: "d4", bonusDie: "None", modifier: 0 },
-    Charm: { baseDie: "d4", bonusDie: "None", modifier: 0 },
-    Fight: { baseDie: "d4", bonusDie: "None", modifier: 0 },
-    Grit: { baseDie: "d4", bonusDie: "None", modifier: 0 },
-    Brain: { baseDie: "d4", bonusDie: "None", modifier: 0 },
-    Brawn: { baseDie: "d4", bonusDie: "None", modifier: 0 }
+    Flight: { baseCount: 1, baseDie: "d4", bonusDie: "None", modifier: 0 },
+    Charm: { baseCount: 1, baseDie: "d4", bonusDie: "None", modifier: 0 },
+    Fight: { baseCount: 1, baseDie: "d4", bonusDie: "None", modifier: 0 },
+    Grit: { baseCount: 1, baseDie: "d4", bonusDie: "None", modifier: 0 },
+    Brain: { baseCount: 1, baseDie: "d4", bonusDie: "None", modifier: 0 },
+    Brawn: { baseCount: 1, baseDie: "d4", bonusDie: "None", modifier: 0 }
   },
   attributeNames: STAT_NAMES.reduce((result, statName) => {
     result[statName] = statName;
@@ -127,6 +129,13 @@ const sheetMenuPanel = document.querySelector("#sheet-menu-panel");
 const statRowTemplate = document.querySelector("#stat-row-template");
 const strengthTemplate = document.querySelector("#strength-template");
 const addStrengthButton = document.querySelector("#add-strength");
+const importStrengthsButton = document.querySelector("#import-strengths");
+const importStrengthsDialog = document.querySelector("#import-strengths-dialog");
+const importStrengthsText = document.querySelector("#import-strengths-text");
+const importStrengthsMessage = document.querySelector("#import-strengths-message");
+const closeImportStrengthsButton = document.querySelector("#close-import-strengths");
+const cancelImportStrengthsButton = document.querySelector("#cancel-import-strengths");
+const confirmImportStrengthsButton = document.querySelector("#confirm-import-strengths");
 const newCharacterButton = document.querySelector("#new-character-button");
 const statRowElements = new Map();
 
@@ -152,7 +161,7 @@ async function initialize() {
   renderStrengths();
   renderSummary();
   renderStartupLocalCharacters();
-  setActiveSheetTab(sheetTabs[0]);
+  setActiveSheetTab(getSavedActiveSheetTab());
   bindStaticEvents();
   setStartupMenuVisible(true);
 }
@@ -205,6 +214,39 @@ function bindStaticEvents() {
     renderStrengths();
     renderSummary();
     persistState("Strength added.");
+  });
+
+  importStrengthsButton.addEventListener("click", () => {
+    openImportStrengthsDialog();
+  });
+
+  closeImportStrengthsButton.addEventListener("click", () => {
+    closeImportStrengthsDialog();
+  });
+
+  cancelImportStrengthsButton.addEventListener("click", () => {
+    closeImportStrengthsDialog();
+  });
+
+  importStrengthsDialog.addEventListener("click", (event) => {
+    if (event.target === importStrengthsDialog) {
+      closeImportStrengthsDialog();
+    }
+  });
+
+  confirmImportStrengthsButton.addEventListener("click", () => {
+    const importedStrengths = parseStrengthImportText(importStrengthsText.value);
+
+    if (importedStrengths.length === 0) {
+      importStrengthsMessage.textContent = "No strengths found.";
+      return;
+    }
+
+    state.strengths.push(...importedStrengths);
+    renderStrengths();
+    renderSummary();
+    persistState(`${importedStrengths.length} strengths imported.`);
+    closeImportStrengthsDialog();
   });
 
   newCharacterButton.addEventListener("click", () => {
@@ -345,6 +387,10 @@ function bindStaticEvents() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      if (!importStrengthsDialog.hidden) {
+        closeImportStrengthsDialog();
+      }
+
       closeAllGlassDropdowns();
       closeSheetMenu();
     }
@@ -913,6 +959,18 @@ function setActiveSheetTab(tab) {
       panel.hidden = !isActive;
     }
   });
+
+  window.localStorage.setItem(ACTIVE_SHEET_TAB_KEY, tab.id);
+}
+
+/**
+ * @returns {HTMLButtonElement}
+ */
+function getSavedActiveSheetTab() {
+  const savedTabId = window.localStorage.getItem(ACTIVE_SHEET_TAB_KEY);
+  const savedTab = savedTabId ? document.getElementById(savedTabId) : null;
+
+  return sheetTabs.includes(savedTab) ? savedTab : sheetTabs[0];
 }
 
 /**
@@ -1021,6 +1079,20 @@ function renderStrengths() {
     card.dataset.strengthId = strength.id;
     strengthsList.append(card);
   }
+}
+
+function openImportStrengthsDialog() {
+  importStrengthsText.value = "";
+  importStrengthsMessage.textContent = "";
+  importStrengthsDialog.hidden = false;
+  closeSheetMenu();
+  importStrengthsText.focus();
+}
+
+function closeImportStrengthsDialog() {
+  importStrengthsDialog.hidden = true;
+  importStrengthsMessage.textContent = "";
+  importStrengthsButton.focus();
 }
 
 function renderSummary() {
@@ -1162,10 +1234,54 @@ function getOrCreateStatRow(statName) {
 
   const fragment = statRowTemplate.content.cloneNode(true);
   const statRow = fragment.querySelector(".stat-row");
+  const baseCountDisplay = fragment.querySelector(".stat-base-count-display");
+  const baseCountInput = fragment.querySelector(".stat-base-count-input");
   const baseDropdown = fragment.querySelector(".stat-base-die");
   const bonusDropdown = fragment.querySelector(".stat-bonus-die");
   const modifierInput = fragment.querySelector(".stat-modifier");
   const statNameInput = fragment.querySelector(".stat-name");
+
+  const startBaseCountEdit = () => {
+    baseCountInput.hidden = false;
+    baseCountDisplay.hidden = true;
+    baseCountInput.value = String(state.stats[statName].baseCount);
+    baseCountInput.focus();
+    baseCountInput.select();
+  };
+
+  baseCountDisplay.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    startBaseCountEdit();
+  });
+
+  baseCountDisplay.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      startBaseCountEdit();
+    }
+  });
+
+  baseCountInput.addEventListener("blur", () => {
+    state.stats[statName].baseCount = clampInteger(baseCountInput.value, 1);
+    baseCountInput.hidden = true;
+    baseCountDisplay.hidden = false;
+    refreshSheetState(`${getStatDisplayName(statName)} updated.`);
+  });
+
+  baseCountInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      baseCountInput.blur();
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      baseCountInput.value = String(state.stats[statName].baseCount);
+      baseCountInput.hidden = true;
+      baseCountDisplay.hidden = false;
+      baseCountDisplay.focus();
+    }
+  });
 
   initializeGlassDropdown(baseDropdown, DIE_OPTIONS, state.stats[statName].baseDie, (value) => {
     state.stats[statName].baseDie = value;
@@ -1207,6 +1323,8 @@ function syncStatRow(statRow, statName, rank) {
   const statNameInput = statRow.querySelector(".stat-name");
   const statRankElement = statRow.querySelector(".stat-rank");
   const statFormulaElement = statRow.querySelector(".stat-formula");
+  const baseCountDisplay = statRow.querySelector(".stat-base-count-display");
+  const baseCountInput = statRow.querySelector(".stat-base-count-input");
   const baseDropdown = statRow.querySelector(".stat-base-die");
   const bonusDropdown = statRow.querySelector(".stat-bonus-die");
   const modifierInput = statRow.querySelector(".stat-modifier");
@@ -1218,6 +1336,13 @@ function syncStatRow(statRow, statName, rank) {
   statRankElement.textContent = rank === 1 ? "Top Edge" : `Rank ${rank}`;
   statFormulaElement.textContent = formatStatExpression(statLine);
 
+  baseCountDisplay.textContent = String(statLine.baseCount);
+  baseCountDisplay.setAttribute("aria-label", `Base die count ${statLine.baseCount}`);
+
+  if (!baseCountInput.hidden && baseCountInput.value !== String(statLine.baseCount)) {
+    baseCountInput.value = String(statLine.baseCount);
+  }
+
   setGlassDropdownValue(baseDropdown, statLine.baseDie);
   setGlassDropdownValue(bonusDropdown, statLine.bonusDie);
 
@@ -1227,7 +1352,7 @@ function syncStatRow(statRow, statName, rank) {
 }
 
 /**
- * @returns {{ statName: string, name: string, line: StatLine, score: number }[]}
+ * @returns {{ statName: string, name: string, line: StatLine }[]}
  */
 function getRankedStats() {
   return STAT_NAMES
@@ -1235,15 +1360,10 @@ function getRankedStats() {
       statName,
       name: getStatDisplayName(statName),
       line: state.stats[statName],
-      score: scoreStatLine(state.stats[statName]),
       originalIndex: index
     }))
     .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-
-      return left.originalIndex - right.originalIndex;
+      return compareStatRank(right.line, left.line) || left.originalIndex - right.originalIndex;
     });
 }
 
@@ -1432,7 +1552,7 @@ function getStatDisplayName(statName) {
  * @returns {string}
  */
 function formatStatExpression(statLine) {
-  let expression = statLine.baseDie;
+  let expression = `${statLine.baseCount}${statLine.baseDie}`;
 
   if (statLine.bonusDie !== "None") {
     expression += ` + ${statLine.bonusDie}`;
@@ -1448,14 +1568,6 @@ function formatStatExpression(statLine) {
 }
 
 /**
- * @param {StatLine} statLine
- * @returns {number}
- */
-function scoreStatLine(statLine) {
-  return parseDieValue(statLine.baseDie) + parseDieValue(statLine.bonusDie) + statLine.modifier;
-}
-
-/**
  * @param {string} dieLabel
  * @returns {number}
  */
@@ -1468,6 +1580,17 @@ function parseDieValue(dieLabel) {
 }
 
 /**
+ * @param {StatLine} left
+ * @param {StatLine} right
+ * @returns {number}
+ */
+function compareStatRank(left, right) {
+  return (left.baseCount - right.baseCount)
+    || (parseDieValue(left.bonusDie) - parseDieValue(right.bonusDie))
+    || (left.modifier - right.modifier);
+}
+
+/**
  * @returns {Strength}
  */
 function createStrength() {
@@ -1475,6 +1598,100 @@ function createStrength() {
     id: crypto.randomUUID(),
     name: "",
     description: ""
+  };
+}
+
+/**
+ * @param {string} importText
+ * @returns {Strength[]}
+ */
+function parseStrengthImportText(importText) {
+  const strengths = [];
+  let currentStrength = null;
+
+  for (const rawLine of importText.split(/\r?\n/)) {
+    const line = normalizeStrengthImportLine(rawLine);
+
+    if (!line || isStrengthSectionHeader(line)) {
+      continue;
+    }
+
+    const parsedStart = parseStrengthStartLine(line);
+
+    if (parsedStart) {
+      if (currentStrength) {
+        strengths.push(currentStrength);
+      }
+
+      currentStrength = {
+        id: crypto.randomUUID(),
+        name: parsedStart.name,
+        description: parsedStart.description
+      };
+      continue;
+    }
+
+    if (currentStrength) {
+      currentStrength.description = currentStrength.description
+        ? `${currentStrength.description}\n${line}`
+        : line;
+    }
+  }
+
+  if (currentStrength) {
+    strengths.push(currentStrength);
+  }
+
+  return strengths.filter((strength) => strength.name.trim());
+}
+
+/**
+ * @param {string} rawLine
+ * @returns {string}
+ */
+function normalizeStrengthImportLine(rawLine) {
+  return rawLine
+    .trim()
+    .replace(/^[•*-]\s*/, "")
+    .replace(/^(?:\*?new\*?|new|updated|\*updated\*)\s*[-:]?\s*/i, "")
+    .trim();
+}
+
+/**
+ * @param {string} line
+ * @returns {boolean}
+ */
+function isStrengthSectionHeader(line) {
+  return /^(?:strengths|additional strengths|stat strength|strategic strengths):?$/i.test(line);
+}
+
+/**
+ * @param {string} line
+ * @returns {{ name: string, description: string } | null}
+ */
+function parseStrengthStartLine(line) {
+  const statStrengthMatch = line.match(/^(Flight|Charm|Fight|Grit|Brain|Brawn):\s*([^-:]+?)\s*[-:]\s*(.*)$/i);
+
+  if (statStrengthMatch) {
+    return {
+      name: `${statStrengthMatch[1]}: ${statStrengthMatch[2].trim()}`,
+      description: statStrengthMatch[3].trim()
+    };
+  }
+
+  if (/^(?:Tier\s+\d+|.+\s+Tier\s+\d+)\b/i.test(line)) {
+    return null;
+  }
+
+  const separatorMatch = line.match(/^(.{2,80}?)\s*[-:]\s+(.+)$/);
+
+  if (!separatorMatch) {
+    return null;
+  }
+
+  return {
+    name: separatorMatch[1].trim(),
+    description: separatorMatch[2].trim()
   };
 }
 
@@ -1491,6 +1708,7 @@ function createDefaultState() {
     stats: STAT_NAMES.reduce((result, statName) => {
       const statLine = DEFAULT_STATE.stats[statName];
       result[statName] = {
+        baseCount: statLine.baseCount,
         baseDie: statLine.baseDie,
         bonusDie: statLine.bonusDie,
         modifier: statLine.modifier
@@ -1527,6 +1745,7 @@ function serializeCharacterState(characterState = state) {
     }, {}),
     stats: STAT_NAMES.reduce((result, statName) => {
       result[statName] = {
+        baseCount: characterState.stats[statName].baseCount,
         baseDie: characterState.stats[statName].baseDie,
         bonusDie: characterState.stats[statName].bonusDie,
         modifier: characterState.stats[statName].modifier
@@ -1574,6 +1793,7 @@ function normalizeCharacterState(parsedState) {
     }
 
     fallbackState.stats[statName] = {
+      baseCount: Number.isFinite(parsedStat.baseCount) ? clampInteger(parsedStat.baseCount, 1) : fallbackState.stats[statName].baseCount,
       baseDie: DIE_OPTIONS.includes(parsedStat.baseDie) ? parsedStat.baseDie : fallbackState.stats[statName].baseDie,
       bonusDie: BONUS_OPTIONS.includes(parsedStat.bonusDie) ? parsedStat.bonusDie : fallbackState.stats[statName].bonusDie,
       modifier: Number.isFinite(parsedStat.modifier) ? clampInteger(parsedStat.modifier) : fallbackState.stats[statName].modifier

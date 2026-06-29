@@ -133,7 +133,10 @@
               <p class="panel-label">Strengths</p>
               <h2>Strength List</h2>
             </div>
-            <button id="add-strength" class="primary-button" type="button">Add Strength</button>
+            <div class="panel-actions">
+              <button id="import-strengths" class="ghost-button" type="button">Import Strengths</button>
+              <button id="add-strength" class="primary-button" type="button">Add Strength</button>
+            </div>
           </header>
 
           <div id="strengths-list" class="strengths-list" aria-live="polite"></div>
@@ -163,6 +166,30 @@
     </div>
   </main>
 
+  <div id="import-strengths-dialog" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="import-strengths-title" hidden>
+    <section class="modal-card import-strengths-card">
+      <header class="modal-header">
+        <div>
+          <p class="panel-label">Import</p>
+          <h2 id="import-strengths-title">Paste Strengths</h2>
+        </div>
+        <button id="close-import-strengths" class="icon-button" type="button" aria-label="Close import strengths">Close</button>
+      </header>
+
+      <label class="field import-strengths-field">
+        <span>Strength Text</span>
+        <textarea id="import-strengths-text" class="import-strengths-textarea" rows="14" placeholder="Paste strengths from Google Docs here"></textarea>
+      </label>
+
+      <p id="import-strengths-message" class="import-strengths-message" aria-live="polite"></p>
+
+      <div class="modal-actions">
+        <button id="cancel-import-strengths" class="ghost-button" type="button">Cancel</button>
+        <button id="confirm-import-strengths" class="primary-button" type="button">Import Strengths</button>
+      </div>
+    </section>
+  </div>
+
   <template id="stat-row-template">
     <article class="stat-row">
       <div class="stat-row-copy">
@@ -177,6 +204,12 @@
       </div>
 
       <div class="stat-controls">
+        <div class="field field-inline field-inline-small stat-base-count-field">
+          <span class="sr-only">Base die count</span>
+          <button class="stat-base-count-display" type="button" aria-label="Base die count"></button>
+          <input class="stat-base-count-input" type="text" inputmode="numeric" pattern="[0-9]*" aria-label="Base die count" hidden>
+        </div>
+
         <label class="field field-inline">
           <span>Base</span>
           <div class="glass-select stat-base-die">
