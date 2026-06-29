@@ -1336,7 +1336,7 @@ function syncStatRow(statRow, statName, rank) {
   statRankElement.textContent = rank === 1 ? "Top Edge" : `Rank ${rank}`;
   statFormulaElement.textContent = formatStatExpression(statLine);
 
-  baseCountDisplay.textContent = `${statLine.baseCount}x`;
+  baseCountDisplay.textContent = String(statLine.baseCount);
   baseCountDisplay.setAttribute("aria-label", `Base die count ${statLine.baseCount}`);
 
   if (!baseCountInput.hidden && baseCountInput.value !== String(statLine.baseCount)) {

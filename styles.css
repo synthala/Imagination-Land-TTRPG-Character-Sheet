@@ -1137,20 +1137,26 @@ textarea:focus {
 }
 
 .base-die-control {
-  display: flex;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  min-height: 45px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    0 16px 32px rgba(10, 34, 54, 0.08);
   overflow: visible;
 }
 
 .stat-base-count-display,
 .stat-base-count-input {
-  flex: 0 0 44px;
-  width: 44px;
-  min-height: 45px;
-  padding: 12px 6px;
+  width: 100%;
+  min-height: 43px;
+  padding: 12px 8px 12px 12px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 17px 0 0 17px;
   background: transparent;
   box-shadow: none;
   color: #000000;
@@ -1168,14 +1174,31 @@ textarea:focus {
 .stat-base-count-display:hover,
 .stat-base-count-display:focus-visible {
   transform: none;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.22);
   color: #0b2b43;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 
 .base-die-control .glass-select {
-  flex: 1 1 auto;
   min-width: 0;
+}
+
+.base-die-control .glass-select-toggle {
+  min-height: 43px;
+  padding-left: 8px;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0 17px 17px 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.base-die-control .glass-select-toggle:hover,
+.base-die-control .glass-select-toggle:focus-visible {
+  transform: none;
+  background:
+    linear-gradient(180deg, var(--button-highlight-start), var(--button-highlight-end));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
 }
 
 .field-inline-small {
